@@ -20,25 +20,27 @@ import platform
 import time 
 import configparser
 import urllib
+import logging
 
 # Configuration Parameters
-CMD_FILE = "/tmp/__mt.cmd"
-NAP_DURATION = 30   # in seconds 
-UTM_GIT_PATH = "https://github.com/dsehrawat/utmBuilds/blob/main/bin/pi/"
-
-
-src = None
-dst = None
-serviceName = "tensileTester.service"
-verbose = False
+TARGET_BUILD_DIR = "tensileTester"
+SERVICE_NAME = TARGET_BUILD_DIR + ".service"
 
 # Parameters that we should not modify
-osName = None # Name of the current operating system
+CMD_FILE = "/tmp/__mt.cmd"
+TMP_DIR = "_tmp"
+LOG_FILE = '/var/log/utmService.log'
+NAP_DURATION = 30   # in seconds 
+BUILD_APPD_DIR = "app"
 
 ############### Function Definitions ####################
+src = None
+dst = None
+osName = None # Name of the current operating system
+
 filesToCopy= [
-    os.path.join("app","env.yaml"),
-    os.path.join("app","testgorm.db")
+    os.path.join(BUILD_APPD_DIR,"env.yaml"),
+    os.path.join(BUILD_APPD_DIR,"testgorm.db")
 ]
 
 def install(buildName, src, dst, dstPath):
@@ -46,13 +48,12 @@ def install(buildName, src, dst, dstPath):
 
     # Find current operating system
     osName = platform.system()
-    tmpDstDir = os.path.join(dstPath, "_tmp")
-    print("temporary directory: ", tmpDstDir)
+    tmpDstDir = os.path.join(dstPath, TMP_DIR)
     
     # Check if 'zip' file exists
-    print("Checking if installer exists ...")
+    logging.info("Checking if installer exists ...")
     if os.path.isfile(src) == False:
-        print("Source file does not exists")
+        logging.error("Source file does not exists")
         sys.exit(2)
     
     dstWithoutExtn = os.path.splitext(src)[0]
@@ -60,36 +61,36 @@ def install(buildName, src, dst, dstPath):
 
     # Create an _tmp directory (remove if already exists)
     if os.path.exists(tmpDstDir):
-        print("Deleting _tmp ...")
+        logging.info("Deleting _tmp ...")
         shutil.rmtree(tmpDstDir)
     
     # Extract the contents to _tmp directory
-    print("Extracting files to _tmp directory ...")
+    logging.info("Extracting files to _tmp directory ...")
     shutil.unpack_archive(src, tmpDstDir)
 
     # Check if destination directory exists
     if dst == None or os.path.exists(dst) == False:
-        print("Destination directory does not exist")
+        logging.info("Destination directory does not exist")
         destFlag = False
 
     if destFlag:
-        print("Copy files from old to new ...")
+        logging.info("Copy files from old to new ...")
         # Copy the contents
         for fileName in filesToCopy:
             destFilePath = os.path.join(tmpDstDir, buildNameWithoutExtn, fileName)
             sourceFilePath = os.path.join(dst, fileName)
             try:
-                print("Copy src: ", sourceFilePath)
-                print("Copy dst: ", destFilePath)
+                logging.info("Copy src: ", sourceFilePath)
+                logging.info("Copy dst: ", destFilePath)
                 shutil.copyfile(sourceFilePath, destFilePath)
             except IOError as e:
-                print("Error copying file: ", fileName)
+                logging.error("Error copying file: ", fileName)
 
     if destFlag:
         bkupFile = dst + "-bkup.zip"
         # Remove if backup already exists 
         if os.path.exists(bkupFile):
-            print("Deleting backup file ...")
+            logging.info("Deleting backup file ...")
             os.remove(bkupFile)
 
         # Backup current destination file
@@ -98,9 +99,9 @@ def install(buildName, src, dst, dstPath):
         
         # Stop the current service if running 
         if "linux" in osName.lower():
-            print("Stopping the service ...")
+            logging.info("Stopping the service ...")
             # Stop the service
-            os.system("sudo systemctl stop " + serviceName)
+            os.system("sudo systemctl stop " + SERVICE_NAME)
             # Let the system rest for few seconds
             time.sleep(5)
             
@@ -110,11 +111,11 @@ def install(buildName, src, dst, dstPath):
 
     # Time to move source file to dest now
     dstDirToMove = os.path.join(dstPath, "_tmp/", buildNameWithoutExtn)
-    print("Directory to move: ", dstDirToMove)
+    logging.info("Directory to move: ", dstDirToMove)
     shutil.move(dstDirToMove, dst)
 
     # Change file permission
-    os.chmod(os.path.join(dst, "app", "tensileTester"), 0o777)
+    os.chmod(os.path.join(dst, BUILD_APPD_DIR, TARGET_BUILD_DIR), 0o777)
     
     # Remove _tmp directory now 
     shutil.rmtree(tmpDstDir)
@@ -122,17 +123,23 @@ def install(buildName, src, dst, dstPath):
 
     # Restart the service 
     if "linux" in osName.lower():
-        print("Starting the service ...")
+        logging.info("Starting the service ...")
         # Stop the service
-        os.system("sudo systemctl start " + serviceName)
+        os.system("sudo systemctl start " + SERVICE_NAME)
         # Let the system rest for few seconds
         time.sleep(5)    
 
-    print("Installed successfully !")
+    logging.info("Installed successfully !")
 
 
 def handleCommand(cmds):
-    print("Received commands: ", cmds)
+    logging.info("Received commands: ", cmds)
+
+    # Command format:
+    #   [cmd]
+    #   build = <utm_pi_build_v1.1.1.zip>
+    #   src-path = <https://github.com/dsehrawat/utmBuilds/blob/main/bin/pi>
+    #   dst-path = /home/ubuntu
 
     buildName = cmds['build']
     srcPath=cmds['src-path']
@@ -140,24 +147,27 @@ def handleCommand(cmds):
 
     if 'https' in srcPath.lower():
         # Fetch the build from Repo
-        # download_url(UTM_GIT_PATH + "/" + buildName, dstPath)
         downloadCommand = "wget -O " + dstPath + "/" + buildName + " " + srcPath + "/" + buildName + "?raw=true"
-        print("Download command: ", downloadCommand)
+        logging.info("Download command: ", downloadCommand)
         os.system(downloadCommand)
         # Verify the file
         if os.path.exists(dstPath + "/" + buildName) == True:
-            print("Build downloaded successfully")
+            logging.info("Build downloaded successfully")
     else:
         # Pick the build from local
-        print("Local build")
+        logging.info("Local build")
 
     # Build downloaded successfully...Need to install it now
-    srcFile = dstPath + "/" + buildName
-    dstFile = dstPath + "/tensileTester"
+    srcFile = os.path.join(dstPath,buildName)
+    dstFile = dstPath + TARGET_BUILD_DIR
     install(buildName, srcFile, dstFile, dstPath)
 
 
 def main():
+
+    # Initialize logging 
+    logging.basicConfig(filename=LOG_FILE, filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+
     # Main Loop...Check for the command
     while True:
         # How will I receive a command?
