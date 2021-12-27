@@ -43,6 +43,13 @@ filesToCopy= [
     os.path.join(BUILD_APPD_DIR,"testgorm.db")
 ]
 
+# Method: install
+# Install a downloaded file
+# Arg:
+# buildName: Name of build file (without path)
+# src: Path of build file (without file name). Local or Git path 
+# dst: Path where build is to be installed (along with build name)
+# dstPath: Path where build is to be installed (without name)
 def install(buildName, src, dst, dstPath):
     destFlag = True
 
@@ -131,19 +138,21 @@ def install(buildName, src, dst, dstPath):
 
     logging.info("Installed successfully !")
 
-
+# Method: handleCommand
+# Handle the command
+# Command format:
+#   [cmd]
+#   build = <utm_pi_build_v1.1.1.zip>
+#   src-path = <https://github.com/dsehrawat/utmBuilds/blob/main/bin/pi>
+#   dst-path = /home/ubuntu
 def handleCommand(cmds):
     logging.info("Received commands: ", cmds)
-
-    # Command format:
-    #   [cmd]
-    #   build = <utm_pi_build_v1.1.1.zip>
-    #   src-path = <https://github.com/dsehrawat/utmBuilds/blob/main/bin/pi>
-    #   dst-path = /home/ubuntu
 
     buildName = cmds['build']
     srcPath=cmds['src-path']
     dstPath = cmds['dst-path']
+    
+    downloadState = False
 
     if 'https' in srcPath.lower():
         # Fetch the build from Repo
@@ -153,16 +162,23 @@ def handleCommand(cmds):
         # Verify the file
         if os.path.exists(dstPath + "/" + buildName) == True:
             logging.info("Build downloaded successfully")
+            downloadState = True
     else:
         # Pick the build from local
         logging.info("Local build")
+        downloadState = True
 
-    # Build downloaded successfully...Need to install it now
-    srcFile = os.path.join(dstPath,buildName)
-    dstFile = dstPath + TARGET_BUILD_DIR
-    install(buildName, srcFile, dstFile, dstPath)
+    if downloadState == True:
+        # Build downloaded successfully...Need to install it now
+        srcFile = os.path.join(dstPath,buildName)
+        dstFile = dstPath + TARGET_BUILD_DIR
+        install(buildName, srcFile, dstFile, dstPath)
+    else:
+        logging.error("Failed to download the file !!!")
 
 
+# Main method
+# It runs in a infinite loop till is find a configuration/command file
 def main():
 
     # Initialize logging 
