@@ -1,0 +1,14 @@
+/**********************************************************************************
+* Code Copyright (C) 2021-2022 MavelTec Solutions Pvt. Ltd. All Rights Reserved.
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See LICENSE.txt for the specific language governing permissions and
+* limitations under the License.
+***********************************************************************************
+* Unauthorized copying of this repo or any of its files, 
+* via any medium is strictly prohibited
+* Proprietary and confidential
+***********************************************************************************
+* Written by MavelTec Solutions Pvt. Ltd., July 2021
+***********************************************************************************/
